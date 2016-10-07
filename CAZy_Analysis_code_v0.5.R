@@ -233,23 +233,23 @@ for (i in 1:length(Enzyme_Classes)){
 }
 
 
-## Build Multiple Heatmaps for number of each CAZy Enzyme Class
-
-for (i in 1:length(Enzyme_Classes)){
-  keep_rows <- grep(Enzyme_Classes[i], CAZy_SingleDom$CAZy_Family)
-  functional_subset <- CAZy_SingleDom[keep_rows,]
-  subset_matrix <- as.matrix(functional_subset[,5:ncol(functional_subset)])
-  rownames(subset_matrix) <- functional_subset$CAZy_Family
-
-  pheatmap(subset_matrix,scale = "none",clustering_method = "ward.D2", margins = c(10,10), 
-          annotation_col = `20cm_Effect`)
-
-}
-
-# One big Heatmap for all CAZy
-subset_matrix <- as.matrix(CAZy_SingleDom[,5:ncol(CAZy_SingleDom)])
-rownames(subset_matrix) <- CAZy_SingleDom$CAZy_Family
-pheatmap(subset_matrix,clustering_method = "ward.D", margins = c(10,10), annotation_col = `20cm_Effect`)
+# ## Build Multiple Heatmaps for number of each CAZy Enzyme Class
+# 
+# for (i in 1:length(Enzyme_Classes)){
+#   keep_rows <- grep(Enzyme_Classes[i], CAZy_SingleDom$CAZy_Family)
+#   functional_subset <- CAZy_SingleDom[keep_rows,]
+#   subset_matrix <- as.matrix(functional_subset[,5:ncol(functional_subset)])
+#   rownames(subset_matrix) <- functional_subset$CAZy_Family
+# 
+#   pheatmap(subset_matrix,scale = "none",clustering_method = "ward.D2", margins = c(10,10), 
+#           annotation_col = `20cm_Effect`)
+# 
+# }
+# 
+# # One big Heatmap for all CAZy
+# subset_matrix <- as.matrix(CAZy_SingleDom[,5:ncol(CAZy_SingleDom)])
+# rownames(subset_matrix) <- CAZy_SingleDom$CAZy_Family
+# pheatmap(subset_matrix,clustering_method = "ward.D", margins = c(10,10), annotation_col = `20cm_Effect`)
 
 ### Development Notes ###
 ## Need a way to label and specify significantly altered organisms from some background set 
@@ -261,7 +261,11 @@ pheatmap(subset_matrix,clustering_method = "ward.D", margins = c(10,10), annotat
 
 
 
-stats_output <- data.frame()
+####
+#### Perform Enrichment Statistics between Metadata Labled Groups
+####
+
+wilx_stats_output <- data.frame()
 
 for (i in 1: nrow(CAZy_SingleDom)){
   test <- subset(CAZy_SingleDom, CAZy_Family == CAZy_SingleDom[i,1])
@@ -271,14 +275,71 @@ for (i in 1: nrow(CAZy_SingleDom)){
   GH_down <- subset(test, exp_plot == "Decrease")
   t_test_out <- t.test(GH_down$value, GH_up$value)
   wilcox_test_out <- wilcox.test(GH_down$value, GH_up$value)
-  cazy_family <- CAZy_SingleDom[i,1]
+  CAZy_Family <- CAZy_SingleDom[i,1]
   p_value_wilx <- wilcox_test_out$p.value
   Sum_up <- sum(GH_up$value)
   Sum_down <- sum(GH_down$value)
-  stats_tmp <- data.frame(cazy_family = cazy_family, Sum_up = Sum_up, Sum_down = Sum_down, 
+  stats_tmp <- data.frame(CAZy_Family = CAZy_Family, Sum_up = Sum_up, Sum_down = Sum_down, 
                           p_value = p_value_wilx)
-  stats_output <- rbind(stats_output, stats_tmp)
+  wilx_stats_output <- rbind(wilx_stats_output, stats_tmp)
 }
+
+wilx_stats_output <- data.frame(wilx_stats_output, FDR = p.adjust(wilx_stats_output$p_value))
+
+write.table(wilx_stats_output, "~/Desktop/Temp_R_Plots/Output_Tables/Wilx_Stats_Output.txt", sep = "\t", row.names = FALSE)
+
+wilx_significant <- subset(wilx_stats_output, FDR <= 0.1)
+
+wilx_significant <- merge(wilx_significant, CAZy_SingleDom, by = "CAZy_Family")
+
+
+####
+#### Build Heatmap of Significantly Different CAZy_Families for all Genomes
+####
+
+sig_heat <- as.matrix(wilx_significant[,10:ncol(wilx_significant)])
+rownames(sig_heat) <- wilx_significant$CAZy_Family
+
+
+
+pheatmap(sig_heat, margins = (c(10,10)),clustering_method = "ward.D",
+         annotation_col = heat_anno, annotation_colors = ann_cols)
+
+
+pheatmap(sig_heat, margins = (c(10,10)),clustering_method = "ward.D", scale = "row",
+         annotation_col = heat_anno, annotation_colors = ann_cols)
+
+sig_heat_Log <- sig_heat + 1
+sig_heat_Log <- apply(sig_heat_Log, 2, log2)
+
+pheatmap(sig_heat_Log, margins = (c(10,10)), clustering_method = "ward.D",
+         annotation_col = heat_anno, annotation_colors = ann_cols)
+
+
+####
+#### Calculate number of Enzymes by General Substrate Class and Treatment in Significant Set 
+####
+
+Substrate_Classes <- read.delim("~/Desktop/testbed/AnnoVisR/Annotation_Templates/CAZy_Substrate_Class.txt", header = TRUE) # Change to biotite dir
+Significant_Gen_Class <- data.frame()
+
+for (i in 1:nrow(Substrate_Classes)){
+  Class_Subset <- wilx_significant[grepl(Substrate_Classes[1,1], wilx_significant$Substrate_Class),]
+  temp_row <- colSums(Class_Subset[10:ncol(Class_Subset)])
+  temp_row <- as.data.frame(t(t(temp_row)))
+  Significant_Gen_Class <- cbind(Significant_Gen_Class, temp_row$V1)
+}
+colnames(Significant_Gen_Class) <- Substrate_Classes$Substrate_Class
+
+
+Substrate_Class_Hits <- data.frame(Substrate_Class = Substrate_Classes$Substrate_Class, Substrate_Class_Hits)
+colnames(Substrate_Class_Hits)[2:ncol(Substrate_Class_Hits)] <- genome_names
+
+rm("Substrate_Classes", "Class_Subset")
+
+write.table(Substrate_Class_Hits, "~/Desktop/Temp_R_Plots/Output_Tables/Substrate_Class_per_Genome.txt", sep = "\t", row.names = FALSE)
+
+
 
 
 

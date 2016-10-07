@@ -1,0 +1,1 @@
+Main_CategorySulfur MetabolismHydrogen MetabolismMethane MetabolismNitrogen MetabolismOxygen MetabolismC1 MetabolismCarbon Monoxide MetabolismCarbon FixationUrea MetabolismHalogenated Compound MetabolismArsenic MetabolismSelenium MetabolismNitrile MetabolismMetal Metabolism
