@@ -198,6 +198,7 @@ ggplot(melt(Enzyme_Diversity), aes(x = Factor, y = value, fill = Factor)) +
   ggtitle("Alpha Diversity Indicies for CAZy Enzymes in Sample Groups") +
   scale_fill_manual(values = c("steelblue", "firebrick3"))
 
+ggsave(paste0("~/Desktop/Temp_R_Plots/CAZy_Summary_Stats/CAZy_Enzyme_Diversity_by_Group.pdf"))
 
 
 
