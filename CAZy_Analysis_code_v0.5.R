@@ -2,6 +2,7 @@ library(plyr)
 library(ggplot2)
 library(pheatmap)
 library(reshape)
+library(vegan)
 
 # gets wd for local execution and sets it to the working directory
 
@@ -11,9 +12,9 @@ setwd("~/Desktop/testbed/AnnotateR_Out/CAZy_HMM_output/") # This should be chang
 
 
 
-####
+#######
 #### Load Metadata
-####
+#######
 
 
 Genome_metadata <- read.delim(file.choose(), header = FALSE)
@@ -24,9 +25,9 @@ row.names(heat_anno) <- Genome_metadata$genome_name
 
 
 
-####
+#######
 ####  Subset Metadata For Good Genomes (>= 70% Complete ; <= 10% Contamination)
-####
+#######
 
 
 Genome_metadata <- subset(Genome_metadata, completeness >= 70 & contamination <= 10)
@@ -53,9 +54,9 @@ ggsave(paste0("~/Desktop/Temp_R_Plots/Sample_Distribution_Stats/Genome_Contam_de
 
 
 
-####
+#######
 ####  Build Single Domain Hit Table
-####
+#######
 
 
 CAZy_SingleDom <- read.delim("~/Desktop/testbed/AnnoVisR/Annotation_Templates/CAZy_Annotation_Template.txt", header = TRUE)
@@ -83,9 +84,9 @@ write.table(CAZy_SingleDom, "~/Desktop/Temp_R_Plots/Output_Tables/Domain_Hits_pe
 
 
 
-####
+#######
 #### Calculate Summary Statistics for Genomes and CAZy Enzymes
-####
+#######
 
 
 Single_Dom_Matrix <- CAZy_SingleDom[,5:ncol(CAZy_SingleDom)]
@@ -95,8 +96,7 @@ CAZy_Variety <- data.frame(Genome_name = Genome_metadata$genome_name, Factor = G
                            Unique_cazy = NA, All_cazy = NA)
 
 
-
-### Populate CAZy_Variety DF with absolute and unique numbers 
+### Populate CAZy_Variety DF with Absolute and Unique Domain Hit Numbers 
 
 for (i in 1:ncol(Single_Dom_Matrix)){
   tmp_count <- sum(ifelse(Single_Dom_Matrix[,i] > 0, 1, 0))
@@ -112,7 +112,7 @@ CAZy_Variety <- data.frame(CAZy_Variety,
                            All_cazy_protnorm = (CAZy_Variety$Unique_cazy/CAZy_Variety$Protein_count)*1000)
 
 
-### Produce Box-Plots of CAZy Count Statistics by Sample Type
+### Produce Box-Plots of CAZy Count Statistics by Group Factor
 
 ggplot(melt(CAZy_Variety[,2:7]), aes(x = Factor, y = value, fill = Factor)) +
          geom_boxplot() +
@@ -123,107 +123,107 @@ ggplot(melt(CAZy_Variety[,2:7]), aes(x = Factor, y = value, fill = Factor)) +
 ggsave(paste0("~/Desktop/Temp_R_Plots/CAZy_Summary_Stats/Group_CAZy_Count_Stats.pdf"))
 
 
-### Calculate F and t Statistics Comparing CAZy Counts by Sample Type
+### Calculate F and t Statistics Comparing CAZy Counts by Group Factor
 
-CAZy_Count_Fandt_Stats <- data.frame(Test_Param = (1:5),F_test = (1:5), t_test = (1:5))
+CAZy_Count_Fandt_Stats <- data.frame(Test_Param = (1:5),F_test = (1:5), t_test = (1:5), Fold_Diff = (1:5))
+
+tmp_decrease <- subset(CAZy_Variety, Factor == "Decrease")[,3:7]
+tmp_increase <- subset(CAZy_Variety, Factor == "Increase")[,3:7]
 
 for (i in 1:5){
- tmp_decrease <- subset(CAZy_Variety, Factor == "Decrease")[,3:7]
- tmp_increase <- subset(CAZy_Variety, Factor == "Increase")[,3:7]
  test_param_tmp <- colnames(tmp_decrease[i])
  F_test_tmp <- var.test(tmp_increase[,i], tmp_decrease[,i])
  var_equal <- ifelse(F_test_tmp$p.value < 0.05, FALSE, TRUE)
  T_test_tmp <- t.test(tmp_increase[,i], tmp_decrease[,i], var.equal = var_equal)
  CAZy_Count_Fandt_Stats[i,1] <- test_param_tmp
- CAZy_Count_Fandt_Stats[1,2] <- F_test_tmp$p.value
- CAZy_Count_Fandt_Stats[1,3] <- T_test_tmp$p.value
+ CAZy_Count_Fandt_Stats[i,2] <- F_test_tmp$p.value
+ CAZy_Count_Fandt_Stats[i,3] <- T_test_tmp$p.value
+ CAZy_Count_Fandt_Stats[i,4] <- unname(T_test_tmp$estimate[1]/T_test_tmp$estimate[2])
 }
+
 
 rm("tmp_decrease", "tmp_increase", "F_test_tmp", "T_test_tmp", "var_equal", "test_param_tmp")
 
+write.table(CAZy_Count_Fandt_Stats, "~/Desktop/Temp_R_Plots/CAZy_Summary_Stats/Group_Count_T_Tests.txt", 
+            sep = "\t", row.names = FALSE)
 
 
+#### Produce Diagnostic Scatter Plots Comparing Various Count Statistics
 
+ggplot(CAZy_Variety, aes(x = Protein_count, y = Unique_cazy, color = Factor)) + 
+  geom_point(size = 3, alpha = 0.8) +
+  stat_smooth(method = "lm") +
+  scale_color_manual(values = c("steelblue", "firebrick3")) +
+  ggtitle("Unique CAZy Enzymes vs Genome Protein Number")
 
-
-Decreased_vector <- subset(CAZy_Variety, Factor == "Decrease")[,4]
-Increased_vector <- subset(CAZy_Variety, Factor == "Increase")[,4]
-
-test <- var.test(Increased_vector, Decreased_vector)
-t.test(Increased_vector, Decreased_vector, var.equal = TRUE)
-
-ifelse(F_test_tmp$p.value < 0.05, FALSE, TRUE)
-
-
-Decreased_all <- subset(CAZy_Variety, Factor == "Decrease")[,5]
-Increased_all <- subset(CAZy_Variety, Factor == "Increase")[,5]
-
-var.test(Increased_all, Decreased_all)
-t.test(Increased_all, Decreased_all, var.equal = TRUE)
-
-Decreased_proteins <- subset(CAZy_Variety, Factor == "Decrease")[,3]
-Increased_proteins <- subset(CAZy_Variety, Factor == "Increase")[,3]
-
-var.test(Increased_proteins, Decreased_proteins)
-t.test(Increased_proteins, Decreased_proteins, var.equal = FALSE)
-
-
-ggplot(CAZy_Variety, aes(x = Protein_count, y = Different_CAZy, color = Factor)) + 
-  geom_point(size = 3, alpha = 0.5) +
-  stat_smooth(method = "lm")
+ggsave(paste0("~/Desktop/Temp_R_Plots/CAZy_Summary_Stats/Unique_CAZy_vs_Protein.pdf"))
 
 ggplot(CAZy_Variety, aes(x = Protein_count, y = All_cazy, color = Factor)) + 
-  geom_point(size = 3, alpha = 0.5) +
-  stat_smooth(method = "lm")
+  geom_point(size = 3, alpha = 0.8) +
+  stat_smooth(method = "lm") +
+  scale_color_manual(values = c("steelblue", "firebrick3")) +
+  ggtitle("Total CAZy Enzymes vs Genome Protein Number")
 
-ggplot(CAZy_Variety, aes(x = All_cazy, y = Different_CAZy, color = Factor)) + 
-  geom_point(size = 3, alpha = 0.5) +
-  stat_smooth(method = "lm")
+ggsave(paste0("~/Desktop/Temp_R_Plots/CAZy_Summary_Stats/Total_CAZy_vs_Protein.pdf"))
 
-ggplot(CAZy_Variety, aes(x = All_cazy/Protein_count, y = Different_CAZy/Protein_count, color = Factor)) + 
-  geom_point(size = 3, alpha = 0.5) +
-  stat_smooth(method = "lm")
+ggplot(CAZy_Variety, aes(x = All_cazy, y = Unique_cazy, color = Factor)) + 
+  geom_point(size = 3, alpha = 0.8) +
+  stat_smooth(method = "lm") +
+  scale_color_manual(values = c("steelblue", "firebrick3")) +
+  ggtitle("Unique CAZy vs Total CAZy")
 
+ggsave(paste0("~/Desktop/Temp_R_Plots/CAZy_Summary_Stats/Unique_CAZy_vs_Total_CAZy.pdf"))
 
+ggplot(CAZy_Variety, aes(x = All_cazy/Protein_count, y = Unique_cazy/Protein_count, color = Factor)) + 
+  geom_point(size = 3, alpha = 0.8) +
+  stat_smooth(method = "lm") +
+  scale_color_manual(values = c("steelblue", "firebrick3")) +
+  ggtitle("Total vs Unique CAZy Enzymes Prot_Normalized")
 
-
-#########################################
-####
-#### Here we specifically calculate 
-####
-
-CAZy_Variety <- data.frame(CAZy_Variety, All_cazy_protnorm = CAZy_Variety$All_cazy/CAZy_Variety$Protein_count, 
-                           Unique_cazy_protnorm = CAZy_Variety$Different_CAZy/CAZy_Variety$Protein_count)
-
-ggplot(CAZy_Variety, aes(x = Factor, y = All_cazy_protnorm)) + geom_boxplot()
-
-Decreased_norm <- subset(CAZy_Variety, Factor == "Decrease")[,6]
-Increased_norm <- subset(CAZy_Variety, Factor == "Increase")[,6]
-
-var.test(Increased_norm, Decreased_norm)
-t.test(Increased_norm, Decreased_norm, var.equal = TRUE)
+ggsave(paste0("~/Desktop/Temp_R_Plots/CAZy_Summary_Stats/Unique_CAZy_vs_Total_CAZy_ProtNorm.pdf"))
 
 
-ggplot(CAZy_Variety, aes(x = Factor, y = Unique_cazy_protnorm)) + geom_boxplot()
-
-Decreased_norm <- subset(CAZy_Variety, Factor == "Decrease")[,7]
-Increased_norm <- subset(CAZy_Variety, Factor == "Increase")[,7]
-
-var.test(Increased_norm, Decreased_norm)
-t.test(Increased_norm, Decreased_norm, var.equal = TRUE)
-
-
-library(vegan)
+#### Compare alpha-diversity Between Factors Based on CAZy Enzyme Abundance
 
 rownames(Single_Dom_Matrix) <- CAZy_SingleDom$CAZy_Family
 
 Enzyme_Diversity <- data.frame(Factor = Genome_metadata$exp_plot, 
-                               Shan_div = diversity(t(Single_Dom_Matrix)),
-                               Simp_div = diversity(t(Single_Dom_Matrix), index = "simpson"),
-                               InvSimp_div = diversity(t(Single_Dom_Matrix), index = "invsimpson"))
+                               Shannon = diversity(t(Single_Dom_Matrix)),
+                               Simpson = diversity(t(Single_Dom_Matrix), index = "simpson"),
+                               InvSimpson = diversity(t(Single_Dom_Matrix), index = "invsimpson"))
 
-ggplot(melt(Enzyme_Diversity), aes(x = Factor, y = value, fill = Factor)) + geom_boxplot() + 
-  facet_wrap(~variable, scales = "free_y")
+ggplot(melt(Enzyme_Diversity), aes(x = Factor, y = value, fill = Factor)) +
+  geom_boxplot() + 
+  facet_wrap(~variable, scales = "free_y") +
+  ggtitle("Alpha Diversity Indicies for CAZy Enzymes in Sample Groups") +
+  scale_fill_manual(values = c("steelblue", "firebrick3"))
+
+
+
+
+#test_matrix <- t(Single_Dom_Matrix)
+#test_matrix <- data.frame(Factor = Genome_metadata$exp_plot, test_matrix)
+
+#test_matrix2 <- subset(test_matrix, Factor == "Decrease")
+
+#All_CAZy = 20677
+#All_GH109 = 1264
+#GH_109_In_Set = 881
+#GH_109_Not_in_Set = 383   # Col 35
+#All_CAZy_In_UP = 12642
+#All_CAZy_In_Down = 
+#All_GH109_In_Down = 383
+
+# example matrix
+#
+#                         PART OF GH109      NOT PART OF GH109
+#         
+# IN ENRICHED SET         881                 11761
+# NOT ENRICHED SET        383                 8035
+#
+
+#fisher.test(matrix(c(881,383,11761,8035), nrow=2, ncol=2))
+
 
 ####
 #### Calculate the number of general substrate class hits per sample
