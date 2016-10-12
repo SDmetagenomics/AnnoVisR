@@ -24,7 +24,7 @@ row.names(heat_anno) <- Genome_metadata$genome_name
 ####  Subset Metadata For Good Genomes (>= 60% Complete ; <= 10% Contamination)
 ####
 
-Genome_metadata <- subset(Genome_metadata, completeness >= 60 & contamination <= 10)
+Genome_metadata <- subset(Genome_metadata, completeness >= 70 & contamination <= 10)
 
 ggplot(Genome_metadata, aes(x = completeness)) + geom_density(fill = "steelblue", color = "steelblue", alpha = 0.5) +
   ggtitle("Genome Completeness Density") + theme(axis.text.x = element_text(colour = "black", size = 12, hjust = 1),
@@ -65,6 +65,82 @@ CAZy_SingleDom <- CAZy_SingleDom[!!rowSums(abs(CAZy_SingleDom[-c(1:4)])),]
 write.table(CAZy_SingleDom, "~/Desktop/Temp_R_Plots/Output_Tables/Domain_Hits_per_Genome.txt", sep = "\t", row.names = FALSE)
 
 
+
+####
+#### Calculate Summary Statistics for Genomes and CAZy Enzymes
+####
+
+
+Single_Dom_Matrix <- CAZy_SingleDom[,5:ncol(CAZy_SingleDom)]
+
+CAZy_Variety <- data.frame(Genome_name = Genome_metadata$genome_name, Factor = Genome_metadata$exp_plot,
+                           Protein_count = Genome_metadata$protein_count,
+                           Different_CAZy = NA, All_cazy = NA)
+
+
+for (i in 1:ncol(Single_Dom_Matrix)){
+  tmp_count <- sum(ifelse(Single_Dom_Matrix[,i] > 0, 1, 0))
+  CAZy_Variety[i,4] <- tmp_count
+  tmp_count <- sum(Single_Dom_Matrix[,i])
+  CAZy_Variety[i,5] <- tmp_count
+}
+
+Decreased_uniq <- subset(CAZy_Variety, Factor == "Decrease")[,4]
+Increased_uniq <- subset(CAZy_Variety, Factor == "Increase")[,4]
+
+var.test(Increased_uniq, Decreased_uniq)
+t.test(Increased_uniq, Decreased_uniq, var.equal = TRUE)
+
+
+Decreased_all <- subset(CAZy_Variety, Factor == "Decrease")[,5]
+Increased_all <- subset(CAZy_Variety, Factor == "Increase")[,5]
+
+var.test(Increased_all, Decreased_all)
+t.test(Increased_all, Decreased_all, var.equal = TRUE)
+
+Decreased_proteins <- subset(CAZy_Variety, Factor == "Decrease")[,3]
+Increased_proteins <- subset(CAZy_Variety, Factor == "Increase")[,3]
+
+var.test(Increased_proteins, Decreased_proteins)
+t.test(Increased_proteins, Decreased_proteins, var.equal = FALSE)
+
+
+ggplot(CAZy_Variety, aes(x = Protein_count, y = Different_CAZy, color = Factor)) + 
+  geom_point(size = 3, alpha = 0.5) +
+  stat_smooth(method = "lm")
+
+ggplot(CAZy_Variety, aes(x = Protein_count, y = All_cazy, color = Factor)) + 
+  geom_point(size = 3, alpha = 0.5) +
+  stat_smooth(method = "lm")
+
+ggplot(CAZy_Variety, aes(x = All_cazy, y = Different_CAZy, color = Factor)) + 
+  geom_point(size = 3, alpha = 0.5) +
+  stat_smooth(method = "lm")
+
+ggplot(CAZy_Variety, aes(x = Protein_count, y = All_cazy/Protein_count, color = Factor)) + 
+  geom_point(size = 3, alpha = 0.5)
+
+
+
+CAZy_Variety <- data.frame(CAZy_Variety, All_cazy_protnorm = CAZy_Variety$All_cazy/CAZy_Variety$Protein_count, 
+                           Unique_cazy_protnorm = CAZy_Variety$Different_CAZy/CAZy_Variety$Protein_count)
+
+ggplot(CAZy_Variety, aes(x = Factor, y = All_cazy_protnorm)) + geom_boxplot()
+
+Decreased_norm <- subset(CAZy_Variety, Factor == "Decrease")[,6]
+Increased_norm <- subset(CAZy_Variety, Factor == "Increase")[,6]
+
+var.test(Increased_norm, Decreased_norm)
+t.test(Increased_norm, Decreased_norm, var.equal = TRUE)
+
+
+ggplot(CAZy_Variety, aes(x = Factor, y = Unique_cazy_protnorm)) + geom_boxplot()
+
+Decreased_norm <- subset(CAZy_Variety, Factor == "Decrease")[,7]
+Increased_norm <- subset(CAZy_Variety, Factor == "Increase")[,7]
+
+var.test(Increased_norm, Decreased_norm)
+t.test(Increased_norm, Decreased_norm, var.equal = TRUE)
 
 
 
@@ -277,9 +353,10 @@ for (i in 1: nrow(CAZy_SingleDom)){
   wilcox_test_out <- wilcox.test(GH_down$value, GH_up$value)
   CAZy_Family <- CAZy_SingleDom[i,1]
   p_value_wilx <- wilcox_test_out$p.value
-  Sum_up <- sum(GH_up$value)
-  Sum_down <- sum(GH_down$value)
-  stats_tmp <- data.frame(CAZy_Family = CAZy_Family, Sum_up = Sum_up, Sum_down = Sum_down, 
+  genome_mean_up <- mean(GH_up$value)
+  genome_mean_down <- mean(GH_down$value)
+  stats_tmp <- data.frame(CAZy_Family = CAZy_Family, genome_mean_up = genome_mean_up, 
+                          genome_mean_down = genome_mean_down, 
                           p_value = p_value_wilx)
   wilx_stats_output <- rbind(wilx_stats_output, stats_tmp)
 }
