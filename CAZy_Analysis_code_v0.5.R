@@ -31,15 +31,25 @@ row.names(heat_anno) <- Genome_metadata$genome_name
 
 
 Genome_metadata <- subset(Genome_metadata, completeness >= 70 & contamination <= 10)
+tmp_metadata_factor1 <- subset(Genome_metadata, exp_plot == "Increase")
+tmp_metadata_factor2 <- subset(Genome_metadata, exp_plot == "Decrease")
+
+
+ks_test_p <- ks.test(tmp_metadata_factor1$completeness, tmp_metadata_factor2$completeness, exact = FALSE)
+
 
 ggplot(Genome_metadata, aes(x = completeness, fill = exp_plot)) + 
   geom_density( alpha = 0.5) +
   ggtitle("Genome Completeness Density") + 
   scale_fill_manual(values = c("steelblue", "firebrick3")) +
   theme(axis.text.x = element_text(colour = "black", size = 12, hjust = 1),
-        axis.text.y = element_text(colour = "black", size = 12))
+        axis.text.y = element_text(colour = "black", size = 12)) +
+  annotate("text", x = 80, y = 0.055, size = 5, label = paste0("KS Test p-Value: ",round(ks_test_p$p.value, 4)))
 
 ggsave(paste0("~/Desktop/Temp_R_Plots/Sample_Distribution_Stats/Genome_Completeness_dens.pdf"))
+
+
+ks_test_p <- ks.test(tmp_metadata_factor1$contamination, tmp_metadata_factor2$contamination, exact = FALSE)
 
 
 ggplot(Genome_metadata, aes(x = contamination, fill = exp_plot)) + 
@@ -47,10 +57,12 @@ ggplot(Genome_metadata, aes(x = contamination, fill = exp_plot)) +
   ggtitle("Genome Contamination Density") + 
   scale_fill_manual(values = c("steelblue", "firebrick3")) +
   theme(axis.text.x = element_text(colour = "black", size = 12, hjust = 1),
-        axis.text.y = element_text(colour = "black", size = 12))
+        axis.text.y = element_text(colour = "black", size = 12)) +
+  annotate("text", x = 2.5, y = 0.20, size = 5, label = paste0("KS Test p-Value: ",round(ks_test_p$p.value, 4)))
 
 ggsave(paste0("~/Desktop/Temp_R_Plots/Sample_Distribution_Stats/Genome_Contam_dens.pdf"))
 
+rm("ks_test_p", "tmp_metadata_factor1", "tmp_metadata_factor2")
 
 
 
@@ -112,6 +124,7 @@ CAZy_Variety <- data.frame(CAZy_Variety,
                            All_cazy_protnorm = (CAZy_Variety$Unique_cazy/CAZy_Variety$Protein_count)*1000)
 
 
+
 ### Produce Box-Plots of CAZy Count Statistics by Group Factor
 
 ggplot(melt(CAZy_Variety[,2:7]), aes(x = Factor, y = value, fill = Factor)) +
@@ -122,30 +135,6 @@ ggplot(melt(CAZy_Variety[,2:7]), aes(x = Factor, y = value, fill = Factor)) +
 
 ggsave(paste0("~/Desktop/Temp_R_Plots/CAZy_Summary_Stats/Group_CAZy_Count_Stats.pdf"))
 
-
-### Calculate F and t Statistics Comparing CAZy Counts by Group Factor
-
-CAZy_Count_Fandt_Stats <- data.frame(Test_Param = (1:5),F_test = (1:5), t_test = (1:5), Fold_Diff = (1:5))
-
-tmp_decrease <- subset(CAZy_Variety, Factor == "Decrease")[,3:7]
-tmp_increase <- subset(CAZy_Variety, Factor == "Increase")[,3:7]
-
-for (i in 1:5){
- test_param_tmp <- colnames(tmp_decrease[i])
- F_test_tmp <- var.test(tmp_increase[,i], tmp_decrease[,i])
- var_equal <- ifelse(F_test_tmp$p.value < 0.05, FALSE, TRUE)
- T_test_tmp <- t.test(tmp_increase[,i], tmp_decrease[,i], var.equal = var_equal)
- CAZy_Count_Fandt_Stats[i,1] <- test_param_tmp
- CAZy_Count_Fandt_Stats[i,2] <- F_test_tmp$p.value
- CAZy_Count_Fandt_Stats[i,3] <- T_test_tmp$p.value
- CAZy_Count_Fandt_Stats[i,4] <- unname(T_test_tmp$estimate[1]/T_test_tmp$estimate[2])
-}
-
-
-rm("tmp_decrease", "tmp_increase", "F_test_tmp", "T_test_tmp", "var_equal", "test_param_tmp")
-
-write.table(CAZy_Count_Fandt_Stats, "~/Desktop/Temp_R_Plots/CAZy_Summary_Stats/Group_Count_T_Tests.txt", 
-            sep = "\t", row.names = FALSE)
 
 
 #### Produce Diagnostic Scatter Plots Comparing Various Count Statistics
@@ -183,6 +172,29 @@ ggplot(CAZy_Variety, aes(x = All_cazy/Protein_count, y = Unique_cazy/Protein_cou
 ggsave(paste0("~/Desktop/Temp_R_Plots/CAZy_Summary_Stats/Unique_CAZy_vs_Total_CAZy_ProtNorm.pdf"))
 
 
+### Calculate F and t Statistics Comparing CAZy Counts by Group Factor
+
+CAZy_Count_Fandt_Stats <- data.frame(Test_Param = (1:5),F_test = (1:5), t_test = (1:5), Fold_Diff = (1:5))
+
+tmp_decrease <- subset(CAZy_Variety, Factor == "Decrease")[,3:7]
+tmp_increase <- subset(CAZy_Variety, Factor == "Increase")[,3:7]
+
+for (i in 1:5){
+ test_param_tmp <- colnames(tmp_decrease[i])
+ F_test_tmp <- var.test(tmp_increase[,i], tmp_decrease[,i])
+ var_equal <- ifelse(F_test_tmp$p.value < 0.05, FALSE, TRUE)
+ T_test_tmp <- t.test(tmp_increase[,i], tmp_decrease[,i], var.equal = var_equal)
+ CAZy_Count_Fandt_Stats[i,1] <- test_param_tmp
+ CAZy_Count_Fandt_Stats[i,2] <- F_test_tmp$p.value
+ CAZy_Count_Fandt_Stats[i,3] <- T_test_tmp$p.value
+ CAZy_Count_Fandt_Stats[i,4] <- unname(T_test_tmp$estimate[1]/T_test_tmp$estimate[2])
+}
+
+
+rm("tmp_decrease", "tmp_increase", "F_test_tmp", "T_test_tmp", "var_equal", "test_param_tmp")
+
+
+
 #### Compare alpha-diversity Between Factors Based on CAZy Enzyme Abundance
 
 rownames(Single_Dom_Matrix) <- CAZy_SingleDom$CAZy_Family
@@ -199,6 +211,31 @@ ggplot(melt(Enzyme_Diversity), aes(x = Factor, y = value, fill = Factor)) +
   scale_fill_manual(values = c("steelblue", "firebrick3"))
 
 ggsave(paste0("~/Desktop/Temp_R_Plots/CAZy_Summary_Stats/CAZy_Enzyme_Diversity_by_Group.pdf"))
+
+
+#### Calculate significance between diversity measures
+
+tmp_decrease <- subset(Enzyme_Diversity, Factor == "Decrease")[,2:4]
+tmp_increase <- subset(Enzyme_Diversity, Factor == "Increase")[,2:4]
+tmp_df <- data.frame(Test_Param = (1:3),F_test = (1:3), t_test = (1:3), Fold_Diff = (1:3))
+  
+for (i in 1:3) {
+  test_param_tmp <- colnames(tmp_decrease[i])
+  F_test_tmp <- var.test(tmp_increase[,i], tmp_decrease[,i])
+  var_equal <- ifelse(F_test_tmp$p.value < 0.05, FALSE, TRUE)
+  T_test_tmp <- t.test(tmp_increase[,i], tmp_decrease[,i], var.equal = var_equal)
+  tmp_df[i,1] <- test_param_tmp
+  tmp_df[i,2] <- F_test_tmp$p.value
+  tmp_df[i,3] <- T_test_tmp$p.value
+  tmp_df[i,4] <- unname(T_test_tmp$estimate[1]/T_test_tmp$estimate[2])
+}
+
+CAZy_Count_Fandt_Stats <- rbind(CAZy_Count_Fandt_Stats, tmp_df)
+
+
+3write.table(CAZy_Count_Fandt_Stats, "~/Desktop/Temp_R_Plots/CAZy_Summary_Stats/CAZy_Count_T_Tests.txt", 
+            sep = "\t", row.names = FALSE)
+
 
 
 
@@ -298,7 +335,7 @@ ann_cols <- list(Class = c(Decrease = "steelblue", Increase = "firebrick3"))
 drows <- vegdist(Substrate_Class_Hits, method = "binomial")
 dcols <- vegdist(t(Substrate_Class_Hits), method = "binom")
 
-pheatmap(Substrate_Class_Hits, scale = "column", clustering_distance_rows = drows,
+pheatmap(Substrate_Class_Hits, scale = "none", clustering_distance_rows = drows,
          clustering_distance_cols = dcols,
          clustering_method = "ward.D",
          margins = (c(10,10)),
@@ -306,9 +343,8 @@ pheatmap(Substrate_Class_Hits, scale = "column", clustering_distance_rows = drow
          annotation_colors = ann_cols)
 
 
-
-
-
+test_corr <- cor(t(Single_Dom_Matrix))
+corrplot(test_corr, type = "upper")
 
 ####  
 #### Calculation of Specific Substrates Hit per Genome
