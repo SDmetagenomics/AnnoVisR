@@ -18,8 +18,8 @@ setwd("~/Desktop/testbed/AnnotateR_Out/CAZy_HMM_output/") # This should be chang
 
 
 Genome_metadata <- read.delim(file.choose(), header = FALSE)
-colnames(Genome_metadata) <- c("genome_name", "protein_count", "completeness", "contamination", "exp_plot")
-heat_anno <- data.frame(Class = Genome_metadata$exp_plot)
+colnames(Genome_metadata) <- c("genome_name", "protein_count", "completeness", "contamination", "Factor")
+heat_anno <- data.frame(Class = Genome_metadata$Factor)
 row.names(heat_anno) <- Genome_metadata$genome_name
 
 
@@ -31,14 +31,14 @@ row.names(heat_anno) <- Genome_metadata$genome_name
 
 
 Genome_metadata <- subset(Genome_metadata, completeness >= 70 & contamination <= 10)
-tmp_metadata_factor1 <- subset(Genome_metadata, exp_plot == "Increase")
-tmp_metadata_factor2 <- subset(Genome_metadata, exp_plot == "Decrease")
+tmp_metadata_factor1 <- subset(Genome_metadata, Factor == "Increase")
+tmp_metadata_factor2 <- subset(Genome_metadata, Factor == "Decrease")
 
 
 ks_test_p <- ks.test(tmp_metadata_factor1$completeness, tmp_metadata_factor2$completeness, exact = FALSE)
 
 
-ggplot(Genome_metadata, aes(x = completeness, fill = exp_plot)) + 
+ggplot(Genome_metadata, aes(x = completeness, fill = Factor)) + 
   geom_density( alpha = 0.5) +
   ggtitle("Genome Completeness Density") + 
   scale_fill_manual(values = c("steelblue", "firebrick3")) +
@@ -52,7 +52,7 @@ ggsave(paste0("~/Desktop/Temp_R_Plots/Sample_Distribution_Stats/Genome_Completen
 ks_test_p <- ks.test(tmp_metadata_factor1$contamination, tmp_metadata_factor2$contamination, exact = FALSE)
 
 
-ggplot(Genome_metadata, aes(x = contamination, fill = exp_plot)) + 
+ggplot(Genome_metadata, aes(x = contamination, fill = Factor)) + 
   geom_density( alpha = 0.5) +
   ggtitle("Genome Contamination Density") + 
   scale_fill_manual(values = c("steelblue", "firebrick3")) +
@@ -103,9 +103,10 @@ write.table(CAZy_SingleDom, "~/Desktop/Temp_R_Plots/Output_Tables/Domain_Hits_pe
 
 Single_Dom_Matrix <- CAZy_SingleDom[,5:ncol(CAZy_SingleDom)]
 
-CAZy_Variety <- data.frame(Genome_name = Genome_metadata$genome_name, Factor = Genome_metadata$exp_plot,
+CAZy_Variety <- data.frame(Genome_name = Genome_metadata$genome_name, Factor = Genome_metadata$Factor,
                            Protein_count = Genome_metadata$protein_count,
                            Unique_cazy = NA, All_cazy = NA)
+
 
 
 ### Populate CAZy_Variety DF with Absolute and Unique Domain Hit Numbers 
@@ -117,23 +118,13 @@ for (i in 1:ncol(Single_Dom_Matrix)){
   CAZy_Variety[i,5] <- tmp_count
 }
 
+
+
 ### Add cazy normalized by genome/protein counts
 
 CAZy_Variety <- data.frame(CAZy_Variety, 
                            Unique_cazy_protnorm = (CAZy_Variety$All_cazy/CAZy_Variety$Protein_count)*1000, 
                            All_cazy_protnorm = (CAZy_Variety$Unique_cazy/CAZy_Variety$Protein_count)*1000)
-
-
-
-### Produce Box-Plots of CAZy Count Statistics by Group Factor
-
-ggplot(melt(CAZy_Variety[,2:7]), aes(x = Factor, y = value, fill = Factor)) +
-         geom_boxplot() +
-         facet_wrap(~ variable, scales = "free_y") +
-         ggtitle("Group CAZy Count Statistics") +
-         scale_fill_manual(values = c("steelblue", "firebrick3"))
-
-ggsave(paste0("~/Desktop/Temp_R_Plots/CAZy_Summary_Stats/Group_CAZy_Count_Stats.pdf"))
 
 
 
@@ -172,6 +163,19 @@ ggplot(CAZy_Variety, aes(x = All_cazy/Protein_count, y = Unique_cazy/Protein_cou
 ggsave(paste0("~/Desktop/Temp_R_Plots/CAZy_Summary_Stats/Unique_CAZy_vs_Total_CAZy_ProtNorm.pdf"))
 
 
+
+### Produce Box-Plots of CAZy Count Statistics by Group Factor
+
+ggplot(melt(CAZy_Variety[,2:7]), aes(x = Factor, y = value, fill = Factor)) +
+         geom_boxplot() +
+         facet_wrap(~ variable, scales = "free_y") +
+         ggtitle("Group CAZy Count Statistics") +
+         scale_fill_manual(values = c("steelblue", "firebrick3"))
+
+ggsave(paste0("~/Desktop/Temp_R_Plots/CAZy_Summary_Stats/Group_CAZy_Count_Stats.pdf"))
+
+
+
 ### Calculate F and t Statistics Comparing CAZy Counts by Group Factor
 
 CAZy_Count_Fandt_Stats <- data.frame(Test_Param = (1:5),F_test = (1:5), t_test = (1:5), Fold_Diff = (1:5))
@@ -195,11 +199,11 @@ rm("tmp_decrease", "tmp_increase", "F_test_tmp", "T_test_tmp", "var_equal", "tes
 
 
 
-#### Compare alpha-diversity Between Factors Based on CAZy Enzyme Abundance
+### Compare alpha-diversity Between Factors Based on CAZy Enzyme Abundance
 
 rownames(Single_Dom_Matrix) <- CAZy_SingleDom$CAZy_Family
 
-Enzyme_Diversity <- data.frame(Factor = Genome_metadata$exp_plot, 
+Enzyme_Diversity <- data.frame(Factor = Genome_metadata$Factor, 
                                Shannon = diversity(t(Single_Dom_Matrix)),
                                Simpson = diversity(t(Single_Dom_Matrix), index = "simpson"),
                                InvSimpson = diversity(t(Single_Dom_Matrix), index = "invsimpson"))
@@ -213,7 +217,8 @@ ggplot(melt(Enzyme_Diversity), aes(x = Factor, y = value, fill = Factor)) +
 ggsave(paste0("~/Desktop/Temp_R_Plots/CAZy_Summary_Stats/CAZy_Enzyme_Diversity_by_Group.pdf"))
 
 
-#### Calculate significance between diversity measures
+
+### Calculate significance between diversity measures
 
 tmp_decrease <- subset(Enzyme_Diversity, Factor == "Decrease")[,2:4]
 tmp_increase <- subset(Enzyme_Diversity, Factor == "Increase")[,2:4]
@@ -232,15 +237,23 @@ for (i in 1:3) {
 
 CAZy_Count_Fandt_Stats <- rbind(CAZy_Count_Fandt_Stats, tmp_df)
 
+rm("tmp_decrease", "tmp_increase", "i", "tmp_count", "test_param_tmp",
+   "var_equal", "T_test_tmp", "F_test_tmp", "tmp_df")
 
-3write.table(CAZy_Count_Fandt_Stats, "~/Desktop/Temp_R_Plots/CAZy_Summary_Stats/CAZy_Count_T_Tests.txt", 
+write.table(CAZy_Count_Fandt_Stats, "~/Desktop/Temp_R_Plots/CAZy_Summary_Stats/CAZy_Count_T_Tests.txt", 
             sep = "\t", row.names = FALSE)
 
+rm("CAZy_Count_Fandt_Stats", "Enzyme_Diversity")
 
 
+
+
+#######
+#### Possible Use of Fischer Test for Significance Testing of CAZy Abundance
+#######
 
 #test_matrix <- t(Single_Dom_Matrix)
-#test_matrix <- data.frame(Factor = Genome_metadata$exp_plot, test_matrix)
+#test_matrix <- data.frame(Factor = Genome_metadata$Factor, test_matrix)
 
 #test_matrix2 <- subset(test_matrix, Factor == "Decrease")
 
@@ -263,9 +276,15 @@ CAZy_Count_Fandt_Stats <- rbind(CAZy_Count_Fandt_Stats, tmp_df)
 #fisher.test(matrix(c(881,383,11761,8035), nrow=2, ncol=2))
 
 
-####
-#### Calculate the number of general substrate class hits per sample
-####
+
+
+#######
+#### Calculate the number of general and specific substrate class hits per sample
+#######
+
+
+
+### Calculation of General Class Hits
 
 Substrate_Classes <- read.delim("~/Desktop/testbed/AnnoVisR/Annotation_Templates/CAZy_Substrate_Class.txt", header = TRUE) # Change to biotite dir
 Substrate_Class_Hits <- data.frame()
@@ -276,15 +295,62 @@ for (i in 1:nrow(Substrate_Classes)){
   Substrate_Class_Hits <- rbind(Substrate_Class_Hits, temp_row)
 }
 
-Substrate_Class_Hits <- data.frame(Substrate_Class = Substrate_Classes$Substrate_Class, Substrate_Class_Hits)
+Genome_Class_Hits <- data.frame(Substrate_Class = Substrate_Classes$Substrate_Class, Substrate_Class_Hits)
+colnames(Genome_Class_Hits)[2:ncol(Genome_Class_Hits)] <- genome_names
+
+rm("Substrate_Classes", "Class_Subset", "temp_row", "i")
+
+write.table(Genome_Class_Hits, "~/Desktop/Temp_R_Plots/Output_Tables/Substrate_Class_per_Genome.txt", sep = "\t", row.names = FALSE)
+
+Total_Class_Counts <- data.frame(Counts = rowSums(Genome_Class_Hits[,2:ncol(Genome_Class_Hits)]))
+Total_Class_Counts <- data.frame(Substrate_Class = Genome_Class_Hits$Substrate_Class, Counts = Total_Class_Counts$Counts)
+
+write.table(Total_Class_Counts, "~/Desktop/Temp_R_Plots/Output_Tables/Substrate_Class_Totals.txt", sep = "\t", row.names = FALSE)
+
+
+
+### Calculation of Specific Substrate Hits
+
+Substrates <- read.delim("~/Desktop/testbed/AnnoVisR/Annotation_Templates/CAZy_Substrate.txt", header = TRUE) # Change to biotite dir
+Substrate_Hits <- data.frame()
+
+for (i in 1:nrow(Substrates)){
+  Class_Subset <- CAZy_SingleDom[grepl(Substrates[i,1], CAZy_SingleDom$Substrate),]
+  temp_row <- colSums(Class_Subset[5:ncol(Class_Subset)])
+  Substrate_Hits <- rbind(Substrate_Hits, temp_row)
+}
+
+Specific_Substrate_Counts <- data.frame(Counts = rowSums(Substrate_Hits))
+Specific_Substrate_Counts <- data.frame(Substrate = Substrates$Substrate, Counts = Specific_Substrate_Counts$Counts)
+
+Substrate_Hits <- data.frame(Substrate = Substrates$Substrate, Substrate_Hits)
 colnames(Substrate_Class_Hits)[2:ncol(Substrate_Class_Hits)] <- genome_names
 
-rm("Substrate_Classes", "Class_Subset")
 
-write.table(Substrate_Class_Hits, "~/Desktop/Temp_R_Plots/Output_Tables/Substrate_Class_per_Genome.txt", sep = "\t", row.names = FALSE)
+rm("Class_Subset", "temp_row", "i")
+
+write.table(Total_Substrate_Counts, "~/Desktop/Temp_R_Plots/Output_Tables/Specific_Substrate_Counts.txt", sep = "\t", row.names = FALSE)
 
 
 
+
+
+
+
+
+
+
+
+
+ggplot(Total_Substrate_Counts, aes(x = reorder(Substrate, -Counts), y = Counts)) + 
+  geom_bar(stat = "identity", fill = "steelblue4", color = "black") + xlab(NULL) +
+  theme(axis.text.x = element_text(colour = "black", size = 12, angle = 90, hjust = 1),
+        axis.text.y = element_text(colour = "black", size = 12))
+
+ggsave(paste0("~/Desktop/Temp_R_Plots/Emzymes_by_Substrate_Class.pdf"))
+
+
+write.table(Total_Substrate_Counts, "~/Desktop/Temp_R_Plots/Output_Tables/Specific_Substrate_Counts.txt", sep = "\t", row.names = FALSE)
 
 
 
@@ -292,8 +358,6 @@ write.table(Substrate_Class_Hits, "~/Desktop/Temp_R_Plots/Output_Tables/Substrat
 #### Plot total number of proteins in genome set acting on a general substrate class
 ####
 
-Total_Class_Counts <- data.frame(Counts = rowSums(Substrate_Class_Hits[,2:ncol(Substrate_Class_Hits)]))
-Total_Class_Counts <- data.frame(Substrate_Class = Substrate_Class_Hits$Substrate_Class, Counts = Total_Class_Counts$Counts)
 
 ggplot(Total_Class_Counts, aes(x = reorder(Substrate_Class, -Counts), y = Counts)) + 
                      geom_bar(stat = "identity", fill = "steelblue4", color = "black") +
@@ -345,38 +409,6 @@ pheatmap(Substrate_Class_Hits, scale = "none", clustering_distance_rows = drows,
 
 test_corr <- cor(t(Single_Dom_Matrix))
 corrplot(test_corr, type = "upper")
-
-####  
-#### Calculation of Specific Substrates Hit per Genome
-####
-
-Substrates <- read.delim("~/Desktop/testbed/AnnoVisR/Annotation_Templates/CAZy_Substrate.txt", header = TRUE)
-Substrate_Hits <- data.frame()
-
-for (i in 1:nrow(Substrates)){
-  Class_Subset <- CAZy_SingleDom[grepl(Substrates[i,1], CAZy_SingleDom$Substrate),]
-  temp_row <- colSums(Class_Subset[5:ncol(Class_Subset)])
-  Substrate_Hits <- rbind(Substrate_Hits, temp_row)
-}
-
-rm("Class_Subset", "temp_row", "i")
-
-
-Total_Substrate_Counts <- data.frame(Counts = rowSums(Substrate_Hits))
-Total_Substrate_Counts <- data.frame(Substrate = Substrates$Substrate, Counts = Total_Substrate_Counts$Counts)
-
-ggplot(Total_Substrate_Counts, aes(x = reorder(Substrate, -Counts), y = Counts)) + 
-  geom_bar(stat = "identity", fill = "steelblue4", color = "black") + xlab(NULL) +
-  theme(axis.text.x = element_text(colour = "black", size = 12, angle = 90, hjust = 1),
-        axis.text.y = element_text(colour = "black", size = 12))
-
-ggsave(paste0("~/Desktop/Temp_R_Plots/Emzymes_by_Substrate_Class.pdf"))
-
-Total_Substrate_Counts <- data.frame(Total_Substrate_Counts, Fraction = Total_Substrate_Counts$Counts/sum(Total_Substrate_Counts$Counts))
-
-write.table(Total_Substrate_Counts, "~/Desktop/Temp_R_Plots/Output_Tables/Specific_Substrate_Counts.txt", sep = "\t", row.names = FALSE)
-
-
 
 
 
@@ -470,9 +502,9 @@ wilx_stats_output <- data.frame()
 for (i in 1: nrow(CAZy_SingleDom)){
   test <- subset(CAZy_SingleDom, CAZy_Family == CAZy_SingleDom[i,1])
   test <- melt(test)
-  test <- data.frame(test, exp_plot = Genome_metadata$exp_plot)
-  GH_up <- subset(test, exp_plot == "Increase")
-  GH_down <- subset(test, exp_plot == "Decrease")
+  test <- data.frame(test, Factor = Genome_metadata$Factor)
+  GH_up <- subset(test, Factor == "Increase")
+  GH_down <- subset(test, Factor == "Decrease")
   t_test_out <- t.test(GH_down$value, GH_up$value)
   wilcox_test_out <- wilcox.test(GH_down$value, GH_up$value)
   CAZy_Family <- CAZy_SingleDom[i,1]

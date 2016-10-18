@@ -15,14 +15,23 @@ colData <- as.data.frame(Sample_Metadata)
 dds <- DESeqDataSetFromMatrix(countData = countData,
                               colData = colData,
                               design = ~ Factor)
-dds
+print(dds)
 
-dds_out <- DESeq(dds)
+dds_out <- DESeq(dds, fitType = "local")
 sizeFactors(dds_out)
 plotDispEsts(dds_out)
+rld <- rlog(dds)
+vsd <- varianceStabilizingTransformation(dds)
+
+library("vsn")
+notAllZero <- (rowSums(counts(dds))>0)
+meanSdPlot(log2(counts(dds_out,normalized=TRUE)[notAllZero,] + 1))
+meanSdPlot(assay(rld[notAllZero,]))
+meanSdPlot(assay(vsd[notAllZero,]))
+
 
 ## Generate PCA and other Diagnostic Plots
-rld <- rlog(dds_out, blind=TRUE)
+rld <- rlog(dds_out)
 plotPCA(rld, intgroup=c("Factor"))
 
 
@@ -36,49 +45,41 @@ DEseq_significant <- subset(DEseq_results, padj < 0.1)
 DEseq_significant_out <- as.data.frame(DEseq_significant)
 
 
-DEseq_heat_obj <- assay(rld)[DEseq_significant@rownames,]
+DEseq_heat_obj <- assay(dds_out)[DEseq_significant@rownames,]
 df <- as.data.frame(colData(dds_out)[,c("Factor")])
 
+dcols <- vegdist(t(log2(DEseq_heat_obj+1)), method = "bray")
 
-pheatmap(DEseq_heat_obj,
-         #clustering_method = "ward.D2",
+plot(hclust(dcols, method = "ward.D"), hang = -1)
+
+test <- data.frame(cmdscale(dcols), Factor = Genome_metadata$exp_plot)
+
+ggplot(test, aes(x = X1, y = X2, color = Factor)) + 
+  geom_point(size = 3) +
+  scale_color_manual(values = c("steelblue", "firebrick3"))
+  
+pheatmap(log2(DEseq_heat_obj+1), clustering_distance_rows = drows,
+         clustering_distance_cols = dcols,
+         clustering_method = "ward.D",
+         treeheight_col = 150,
          margins = (c(10,10)),
-         annotation_col = heat_anno, 
-         annotation_colors = ann_cols )
-
-DEseq_heat_obj <- assay(dds_out)[DEseq_significant@rownames,]
+         annotation_col = heat_anno)
 
 
 
-library(ropls)
-pls_DA_model <- opls(t(DEseq_heat_obj), Genome_metadata$exp_plot)
+#gene_to_plot <- "PL9"
+
+#d <- plotCounts(dds_out, gene=gene_to_plot, intgroup=c("Factor"),
+                returnData=TRUE)
+#ggplot(d, aes(x=Factor, y=count, fill=Factor)) + 
+#  ggtitle(gene_to_plot) +
+#  stat_summary(fun.y="mean", geom="point", size = 4, shape = 21) + 
+#  geom_jitter() +
+#  ylim(c(0,5))
+#  #scale_y_log10() +
+#  #scale_x_discrete(limits = c("control20", "treatment20", "control30", "treatment30", "control40", "treatment40")) +
+#  #geom_boxplot()  
+#  #scale_fill_manual(values = colourList)
 
 
-Scores <- data.frame(class = Genome_metadata$exp_plot, pls_DA_model@scoreMN)
 
-ggplot(Scores, aes(x = p1, y = p2, color = class, fill = class)) + geom_point(size = 3) + 
-  stat_ellipse(geom="polygon", alpha = 0.5)
-
-
-Loadings <- data.frame(Variable = rownames(pls_DA_model@loadingMN), pls_DA_model@loadingMN[,1:2])
-
-ggplot(Loadings, aes(x = p1, y = p2, label = Variable)) + geom_point(alpha = 0.5, size = 3, color = "purple") +
-  geom_text(nudge_x = 0.05) + geom_hline(yintercept = 0) + geom_vline(xintercept = 0) +
-  expand_limits(x = c(-.5,.5), y = c(-.75,.75)) + ggtitle("Loadings")
-
-
-ggplot() + geom_point(data = Scores, aes(x = p1, y = p2, color = class, fill = class), size = 3) + 
-  #stat_ellipse(data = Scores, aes(x = p1, y = p2, color = class, fill = class), geom="polygon", alpha = 0.5) + 
-  geom_segment(data = Loadings, aes(x = 0, y = 0, xend = 8*p1, yend = 8*p2), linetype = 5) +
-  geom_text(data = Loadings, aes(x = 8*p1, y = 8*p2, label = Variable), nudge_x = -.5)
-
-
-VIP_scores <- data.frame(Names = rownames(as.data.frame(pls_DA_model@vipVn)), VIP = pls_DA_model@vipVn)
-
-ggplot(VIP_scores, aes(x = reorder(Names, -VIP), y = VIP)) + geom_bar(stat="identity", fill = "steelblue")
-
-
-for_ggplot <- data.frame(pls_DA_model@scoreMN, Factor = Genome_metadata$exp_plot)
-
-poop <- ggplot(for_ggplot, aes(x = p1, y = p2, color = Factor)) + geom_point()
-poop
