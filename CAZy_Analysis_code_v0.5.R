@@ -129,7 +129,7 @@ CAZy_Variety <- data.frame(CAZy_Variety,
 
 
 
-#### Produce Diagnostic Scatter Plots Comparing Various Count Statistics
+### Produce Diagnostic Scatter Plots Comparing Various Count Statistics
 
 ggplot(CAZy_Variety, aes(x = Protein_count, y = Unique_cazy, color = Factor)) + 
   geom_point(size = 3, alpha = 0.8) +
