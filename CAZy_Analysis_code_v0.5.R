@@ -83,10 +83,11 @@ for (i in 1:length(genome_names)){
   CAZy_SingleDom <- merge(CAZy_SingleDom, temp_counts1, by="CAZy_Family", all=TRUE)
 }
 
-rm("temp_counts1","temp_table1")
+rm("temp_counts1","temp_table1", "i")
 
 
-## Make NA == 0 & Parse out CAZy enzymes with no hits in any organism (All Zero Rows)
+
+### Make NA == 0 & Parse out CAZy enzymes with no hits in any organism (All Zero Rows)
 
 CAZy_SingleDom[is.na(CAZy_SingleDom)] <- 0
 CAZy_SingleDom <- CAZy_SingleDom[!!rowSums(abs(CAZy_SingleDom[-c(1:4)])),]
@@ -323,83 +324,84 @@ for (i in 1:nrow(Substrates)){
 Specific_Substrate_Counts <- data.frame(Counts = rowSums(Substrate_Hits))
 Specific_Substrate_Counts <- data.frame(Substrate = Substrates$Substrate, Counts = Specific_Substrate_Counts$Counts)
 
-Substrate_Hits <- data.frame(Substrate = Substrates$Substrate, Substrate_Hits)
-colnames(Substrate_Class_Hits)[2:ncol(Substrate_Class_Hits)] <- genome_names
+write.table(Specific_Substrate_Counts, "~/Desktop/Temp_R_Plots/Output_Tables/Specific_Substrate_Totals.txt", sep = "\t", row.names = FALSE)
 
+Genome_Substrate_Hits <- data.frame(Substrate = Substrates$Substrate, Substrate_Hits)
+colnames(Genome_Substrate_Hits)[2:ncol(Genome_Substrate_Hits)] <- genome_names
 
-rm("Class_Subset", "temp_row", "i")
+write.table(Genome_Substrate_Hits, "~/Desktop/Temp_R_Plots/Output_Tables/Specific_Substrate_per_Genome.txt", sep = "\t", row.names = FALSE)
 
-write.table(Total_Substrate_Counts, "~/Desktop/Temp_R_Plots/Output_Tables/Specific_Substrate_Counts.txt", sep = "\t", row.names = FALSE)
-
-
-
-
+rm("Class_Subset", "temp_row", "i", "Substrates", "Substrate_Class_Hits", "Substrate_Hits")
 
 
 
+### Calculation and Graphing of CAZy Enzyme Class Hits
+
+Enzyme_Classes <- c("GH", "GT", "CE", "PL", "AA")
+
+for (i in 1:length(Enzyme_Classes)){
+  keep_rows <- grep(Enzyme_Classes[i], CAZy_SingleDom$CAZy_Family)
+  functional_subset <- CAZy_SingleDom[keep_rows,]
+  function_sums <- data.frame(CAZy_Family = functional_subset$CAZy_Family, 
+                              Counts = rowSums(functional_subset[,5:ncol(functional_subset)]))
+  
+ggplot(function_sums, aes(x = reorder(CAZy_Family, -Counts), y = Counts)) +
+      geom_bar(stat = "identity", fill = "steelblue4", color = "black") +
+      xlab(NULL) +
+      ylab("Domain Counts")
+      theme(axis.text.x = element_text(colour = "black", size = 10, angle = 90, hjust = 1),
+      axis.text.y = element_text(colour = "black", size = 12))
+
+
+  ggsave(paste0("~/Desktop/Temp_R_Plots/CAZy_Summary_Stats/",Enzyme_Classes[i],"_Domain_Counts.pdf"), width = 14)
+}
+
+rm("Enzyme_Classes", "keep_rows", "i", "functional_subset", "function_sums")
 
 
 
 
-
-ggplot(Total_Substrate_Counts, aes(x = reorder(Substrate, -Counts), y = Counts)) + 
-  geom_bar(stat = "identity", fill = "steelblue4", color = "black") + xlab(NULL) +
-  theme(axis.text.x = element_text(colour = "black", size = 12, angle = 90, hjust = 1),
-        axis.text.y = element_text(colour = "black", size = 12))
-
-ggsave(paste0("~/Desktop/Temp_R_Plots/Emzymes_by_Substrate_Class.pdf"))
-
-
-write.table(Total_Substrate_Counts, "~/Desktop/Temp_R_Plots/Output_Tables/Specific_Substrate_Counts.txt", sep = "\t", row.names = FALSE)
+#######
+#### Plots/Heatmaps of General and Specific Substrate hits
+#######
 
 
 
-####
-#### Plot total number of proteins in genome set acting on a general substrate class
-####
-
+### Bar Plots of Counts
 
 ggplot(Total_Class_Counts, aes(x = reorder(Substrate_Class, -Counts), y = Counts)) + 
-                     geom_bar(stat = "identity", fill = "steelblue4", color = "black") +
-                     ggtitle("Enzymes by Substrate Class") +
-                     xlab(NULL) + ylab("Protein Counts") +
-                     theme(axis.text.x = element_text(colour = "black", size = 12, angle = 45, hjust = 1),
-                           axis.text.y = element_text(colour = "black", size = 12))
-
-ggsave(paste0("~/Desktop/Temp_R_Plots/Emzymes_by_Substrate_Class.pdf"))
-
-
-ggplot(Total_Class_Counts, aes(x = reorder(Substrate_Class, -Counts), y = Counts/sum(Total_Class_Counts$Counts))) + 
   geom_bar(stat = "identity", fill = "steelblue4", color = "black") +
-  ggtitle("Fraction of Enzymes per Substrate Class") +
-  xlab(NULL) + ylab("Fraction of Proteins") +
+  ggtitle("Domain Counts by General Substrate Class") +
+  xlab(NULL) + 
+  ylab("Domain Counts") +
   theme(axis.text.x = element_text(colour = "black", size = 12, angle = 45, hjust = 1),
         axis.text.y = element_text(colour = "black", size = 12))
 
-ggsave(paste0("~/Desktop/Temp_R_Plots/Enzyme_Fraction_for_Substrate_Class.pdf"))
-
-Total_Class_Counts <- data.frame(Total_Class_Counts, Fraction = Total_Class_Counts$Counts/sum(Total_Class_Counts$Counts))
-
-write.table(Total_Class_Counts, "~/Desktop/Temp_R_Plots/Output_Tables/Substrate_Class_Counts.txt", sep = "\t", row.names = FALSE)
+ggsave(paste0("~/Desktop/Temp_R_Plots/CAZy_Summary_Stats/General_Substrate_Class_Counts.pdf"))
 
 
+ggplot(Specific_Substrate_Counts, aes(x = reorder(Substrate, -Counts), y = Counts)) + 
+  geom_bar(stat = "identity", fill = "steelblue4", color = "black") + 
+  ggtitle("Domain Counts by Specific Substrate") +
+  xlab(NULL) +
+  ylab("Domain Counts") +
+  theme(axis.text.x = element_text(colour = "black", size = 12, angle = 90, hjust = 1),
+        axis.text.y = element_text(colour = "black", size = 12))
+
+ggsave(paste0("~/Desktop/Temp_R_Plots/CAZy_Summary_Stats/Specific_Substrate_Counts.pdf"))
 
 
 
+### Heatmaps of Counts per Genome
 
-####
-#### Build Heatmap of Substrate_Class_Hits per genome
-####  
-
-rownames(Substrate_Class_Hits) <- Substrate_Class_Hits$Substrate_Class
-Substrate_Class_Hits <- as.matrix(Substrate_Class_Hits[,2:ncol(Substrate_Class_Hits)])
-
+rownames(Genome_Class_Hits) <- Genome_Class_Hits$Substrate_Class
+Genome_Class_Hits <- as.matrix(Genome_Class_Hits[,2:ncol(Genome_Class_Hits)])
 ann_cols <- list(Class = c(Decrease = "steelblue", Increase = "firebrick3"))
 
-drows <- vegdist(Substrate_Class_Hits, method = "binomial")
-dcols <- vegdist(t(Substrate_Class_Hits), method = "binom")
+drows <- vegdist(Genome_Class_Hits, method = "bray")
+dcols <- vegdist(t(Genome_Class_Hits), method = "bray")
 
-pheatmap(Substrate_Class_Hits, scale = "none", clustering_distance_rows = drows,
+pheatmap(log2(Genome_Class_Hits + 1), scale = "none", clustering_distance_rows = drows,
          clustering_distance_cols = dcols,
          clustering_method = "ward.D",
          margins = (c(10,10)),
@@ -407,37 +409,8 @@ pheatmap(Substrate_Class_Hits, scale = "none", clustering_distance_rows = drows,
          annotation_colors = ann_cols)
 
 
-test_corr <- cor(t(Single_Dom_Matrix))
-corrplot(test_corr, type = "upper")
-
-
-
-
-####
-#### Build table and heatmap of Specific Substrate Hits in each Genome
-####
-
-export_table <- data.frame(Substrate_Hits)
-colnames(export_table) <- genome_names
-export_table <- cbind(Substrates$Substrate, export_table)
-
-write.table(Total_Substrate_Counts, "~/Desktop/Temp_R_Plots/Output_Tables/Specific_Substrate_by_Genome.txt", sep = "\t", row.names = FALSE)
-rm(export_table)
-
-
-Substrate_Hits <- as.matrix(Substrate_Hits)
-rownames(Substrate_Hits) <- Substrates$Substrate
-colnames(Substrate_Hits) <- genome_names
-
-
-pheatmap(Substrate_Hits, margins = (c(10,10)),clustering_method = "ward.D",
-         annotation_col = heat_anno, annotation_colors = ann_cols)
-
-Substrate_Hits_Log <- Substrate_Hits + 1
-Substrate_Hits_Log <- apply(Substrate_Hits_Log, 2, log2)
-
-pheatmap(Substrate_Hits_Log, margins = (c(10,10)),clustering_method = "ward.D",
-         annotation_col = heat_anno, annotation_colors = ann_cols)
+rownames(Genome_Substrate_Hits) <- Genome_Substrate_Hits$Substrate
+Genome_Substrate_Hits <- as.matrix(Genome_Substrate_Hits[,2:ncol(Genome_Substrate_Hits)])
 
 
 
@@ -461,9 +434,10 @@ for (i in 1:length(Enzyme_Classes)){
          theme(axis.text.x = element_text(colour = "black", size = 10, angle = 90, hjust = 1),
          axis.text.y = element_text(colour = "black", size = 12))
   
-  ggsave(paste0("~/Desktop/Temp_R_Plots/",Enzyme_Classes[i],"_Protein_Counts.pdf"), width = 14)
+  ggsave(paste0("~/Desktop/Temp_R_Plots/CAZy_Summary_Stats/",Enzyme_Classes[i],"_Protein_Counts.pdf"), width = 14)
 }
 
+rm("Enzyme_Classes", "keep_rows", "i", "functional_subset", "function_sums")
 
 # ## Build Multiple Heatmaps for number of each CAZy Enzyme Class
 # 
