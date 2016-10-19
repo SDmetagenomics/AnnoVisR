@@ -48,20 +48,29 @@ DEseq_significant_out <- as.data.frame(DEseq_significant)
 DEseq_heat_obj <- assay(dds_out)[DEseq_significant@rownames,]
 df <- as.data.frame(colData(dds_out)[,c("Factor")])
 
+
+drows <- vegdist(log2(DEseq_heat_obj+1), method = "bray")
 dcols <- vegdist(t(log2(DEseq_heat_obj+1)), method = "bray")
 
-plot(hclust(dcols, method = "ward.D"), hang = -1)
+dcols_cuttree <- hclust(dcols, method = "ward.D")
+dcols_cuttree <- cutree(dcols_cuttree, k = 4)
 
-test <- data.frame(cmdscale(dcols), Factor = Genome_metadata$exp_plot)
+write.table(dcols_cuttree, "~/Desktop/Temp_R_Plots/DEseq2_Output/Significant_Heatmap_Tree_Clusters.txt", sep ="\t")
 
-ggplot(test, aes(x = X1, y = X2, color = Factor)) + 
+
+dcols_MDS <- data.frame(cmdscale(dcols), Factor = Genome_metadata$Factor)
+
+ggplot(test, aes(x = X1, y = X2, color = Factor)) +
+  ggtitle("MDS Plot of Bray-Curtis Distance") +
+  xlab("MDS Comp 1") +
+  ylab("MDS Comp 2") +
   geom_point(size = 3) +
   scale_color_manual(values = c("steelblue", "firebrick3"))
   
 pheatmap(log2(DEseq_heat_obj+1), clustering_distance_rows = drows,
          clustering_distance_cols = dcols,
          clustering_method = "ward.D",
-         treeheight_col = 150,
+         treeheight_col = 150,cutree_cols = 4,
          margins = (c(10,10)),
          annotation_col = heat_anno)
 
@@ -70,7 +79,7 @@ pheatmap(log2(DEseq_heat_obj+1), clustering_distance_rows = drows,
 #gene_to_plot <- "PL9"
 
 #d <- plotCounts(dds_out, gene=gene_to_plot, intgroup=c("Factor"),
-                returnData=TRUE)
+#                returnData=TRUE)
 #ggplot(d, aes(x=Factor, y=count, fill=Factor)) + 
 #  ggtitle(gene_to_plot) +
 #  stat_summary(fun.y="mean", geom="point", size = 4, shape = 21) + 
