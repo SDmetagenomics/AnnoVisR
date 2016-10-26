@@ -1,5 +1,6 @@
 library(plyr)
 library(ggplot2)
+library(RColorBrewer)
 library(pheatmap)
 library(reshape)
 library(vegan)
@@ -172,6 +173,22 @@ rowSums(Sub_Category_Hits)
 
 
 
+#### Master plot of all hits 
+
+cols <- colorRampPalette(brewer.pal(8, "Set1"))(27)
+
+temp_all <- data.frame(Master_Metabolic_Hits[2:4], Counts = rowSums(Master_Metabolic_Matrix))
+
+ggplot(temp_all, aes(x = reorder(Gene, -Counts), y = Counts + 1, fill = Sub_Category)) + 
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = cols) +
+  facet_wrap(~Main_Category, scales = "free") +
+  scale_y_log10() +
+  xlab(NULL) +
+  theme(axis.text.x = element_text(size = 10, angle = 45, hjust = 1))
+
+
+
 library(ropls)
 pls_DA_model <- opls(t(Binary_SubRole_Matrix), Genome_metadata$Factor, crossvalI = 10, permI = 1000)
 
@@ -190,7 +207,7 @@ ggplot(Model_QRParams, aes(x = Component, y = value, fill = variable)) +
 Scores <- data.frame(class = Genome_metadata$Factor, pls_DA_model@scoreMN)
 
 ggplot(Scores, aes(x = p1, y = p2, color = class, fill = class)) + geom_point(size = 3) + 
-  stat_ellipse(geom="polygon", alpha = 0.5) + scale_fill_manual(values = c("steelblue", "firebrick3")) +
+  #stat_ellipse(geom="polygon", alpha = 0.5) + scale_fill_manual(values = c("steelblue", "firebrick3")) +
   scale_color_manual(values = c("steelblue", "firebrick3"))
 
 Loadings <- data.frame(Variable = rownames(pls_DA_model@loadingMN), pls_DA_model@loadingMN[,1:2])
@@ -346,5 +363,5 @@ pheatmap(t(ordered_matrix), cluster_cols = FALSE, cluster_rows = FALSE, annotati
 ####  Perform Enrichment Statistics 
 #######
 
-
-
+temp_dataset <- t(Binary_SubRole_Matrix)
+temp_dataset <- 
